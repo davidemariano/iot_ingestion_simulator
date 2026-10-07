@@ -1,0 +1,31 @@
+<div #host class="map map--osm" [class.can-register]="canRegister()"></div>
+
+<div class="hint">
+  @if (canRegister()) {
+    <span class="hint__dot"></span> Clic su un terreno per registrare una stazione
+  } @else {
+    Sola lettura · ruolo agricoltore
+  }
+</div>
+
+<div class="seg base" role="group" aria-label="Mappa di base">
+  <button type="button" [class.on]="base() === 'osm'" (click)="base.set('osm')">Mappa</button>
+  <button type="button" [class.on]="base() === 'sat'" (click)="base.set('sat')">Satellite</button>
+</div>
+
+<div class="legend" aria-label="Legenda">
+  <div class="legend__col">
+    <span class="eyebrow">Stato stazione</span>
+    @for (s of states; track s[0]) {
+      <span class="legend__row"
+        ><span class="diamond" [style.--c]="s[1].color"></span>{{ s[1].label }}</span
+      >
+    }
+  </div>
+  <div class="legend__col">
+    <span class="eyebrow">Sorgente del terreno</span>
+    <span class="legend__row"><span class="sw sw--iot"></span>IOT · stazione completa</span>
+    <span class="legend__row"><span class="sw sw--sat"></span>SATELLITE</span>
+    <span class="legend__row"><span class="dot-alert"></span>Allerta aperta</span>
+  </div>
+</div>

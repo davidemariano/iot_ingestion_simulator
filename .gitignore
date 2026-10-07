@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Node / Angular
+node_modules/
+dashboard/dist/
+dashboard/.angular/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store

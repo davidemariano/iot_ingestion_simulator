@@ -1,0 +1,305 @@
+@if (detail(); as d) {
+  <header class="head">
+    <div class="head__eyebrow">
+      <span class="eyebrow">Stazione</span>
+      <span class="mono gw">{{ d.gateway_id }}</span>
+    </div>
+    @if (editing()) {
+      <form class="rename" (submit)="$event.preventDefault(); saveName()">
+        <input
+          class="field"
+          type="text"
+          maxlength="60"
+          [value]="draftName()"
+          (input)="draftName.set($any($event.target).value)"
+          aria-label="Nome della stazione"
+        />
+        <button class="btn btn--primary btn--sm" type="submit" [disabled]="!draftName().trim()">
+          Salva
+        </button>
+        <button class="btn btn--ghost btn--sm" type="button" (click)="editing.set(false)">
+          Annulla
+        </button>
+      </form>
+    } @else {
+      <h2>
+        {{ d.nome }}
+        @if (canEdit()) {
+          <button
+            class="btn btn--ghost btn--icon rename-btn"
+            type="button"
+            (click)="startRename()"
+            aria-label="Rinomina"
+          >
+            <ag-icon name="edit" [size]="13" />
+          </button>
+        }
+      </h2>
+    }
+    <button
+      class="btn btn--ghost btn--icon close"
+      type="button"
+      (click)="closed.emit()"
+      aria-label="Chiudi il dettaglio"
+    >
+      <ag-icon name="close" />
+    </button>
+    <div class="head__status">
+      <span class="state"
+        ><span class="diamond" [style.--c]="stateMeta(d.stato).color"></span
+        >{{ stateMeta(d.stato).label }}</span
+      >
+      <span
+        class="pill"
+        [class.pill--iot]="d.sorgente === 'IOT'"
+        [class.pill--sat]="d.sorgente === 'SATELLITE'"
+      >
+        Sorgente {{ d.sorgente }}
+      </span>
+    </div>
+  </header>
+
+  <div class="scroll">
+    <dl class="meta">
+      <div>
+        <dt class="eyebrow">Terreno</dt>
+        <dd>{{ d.land_nome }}</dd>
+      </div>
+      <div>
+        <dt class="eyebrow">Ultimo contatto</dt>
+        <dd>
+          <span class="mono">{{ ago(d.ultimo_contatto_il, simNow()) }}</span>
+          @if (d.ultimo_contatto_il) {
+            <span class="muted"> · {{ tm(d.ultimo_contatto_il) }}</span>
+          }
+        </dd>
+      </div>
+      <div>
+        <dt class="eyebrow">Cadenza</dt>
+        <dd>
+          @if (canEdit()) {
+            <select
+              class="field field--inline mono"
+              [value]="d.cadenza_s"
+              (change)="setCadence($any($event.target).value)"
+              aria-label="Cadenza di acquisizione"
+            >
+              @for (c of cadences; track c) {
+                <option [value]="c" [selected]="c === d.cadenza_s">{{ dur(c) }}</option>
+              }
+            </select>
+          } @else {
+            <span class="mono">{{ dur(d.cadenza_s) }}</span>
+          }
+        </dd>
+      </div>
+      <div>
+        <dt class="eyebrow">Canali presenti</dt>
+        <dd>
+          <span class="mono" [class.warn]="present() < 16">{{ present() }}/16</span>
+          <span class="muted"> entro 2 intervalli</span>
+        </dd>
+      </div>
+      <div>
+        <dt class="eyebrow">Posizione</dt>
+        <dd class="mono">{{ num(d.lat, 5) }}, {{ num(d.lon, 5) }}</dd>
+      </div>
+      <div>
+        <dt class="eyebrow">Registrata</dt>
+        <dd>{{ dt(d.registrata_il) }}</dd>
+      </div>
+    </dl>
+
+    <section class="sec">
+      <h3 class="eyebrow">Acqua disponibile nella zona radicale</h3>
+      @if (d.stato === 'ATTIVO_COMPLETO' || rawInd()) {
+        <ag-water-gauge
+          [raw]="rawInd()?.valore ?? null"
+          [theta]="rawInd()?.dettagli?.['theta'] ?? null"
+          [fc]="d.theta_fc"
+          [wp]="d.theta_wp"
+        />
+        @if (d.stato !== 'ATTIVO_COMPLETO') {
+          <p class="note">
+            Ultimo valore calcolato: il modello near-real-time gira solo per le stazioni complete.
+          </p>
+        }
+      } @else {
+        <p class="note">
+          Il modello near-real-time si attiva quando la stazione è <b>ATTIVO_COMPLETO</b>. Nel
+          frattempo il terreno usa la sorgente SATELLITE.
+        </p>
+      }
+    </section>
+
+    <section class="sec">
+      <h3 class="eyebrow">
+        Allerte aperte <span class="mono">{{ alerts().length }}</span>
+      </h3>
+      @for (a of alerts(); track a.id) {
+        <article class="alert" [class.crit]="a.severita === 'critica'">
+          <div class="alert__top">
+            <b>{{ alertLabel(a.tipo) }}</b>
+            <span
+              class="pill"
+              [class.pill--crit]="a.severita === 'critica'"
+              [class.pill--warn]="a.severita === 'attenzione'"
+              >{{ a.severita }}</span
+            >
+          </div>
+          <p>{{ a.messaggio }}</p>
+          <span class="mono muted alert__time"
+            >aperta {{ dt(a.aperta_il) }} · {{ ago(a.aperta_il, simNow()) }}</span
+          >
+        </article>
+      } @empty {
+        <p class="note">Nessuna allerta aperta.</p>
+      }
+    </section>
+
+    <section class="sec sec--flush">
+      <h3 class="eyebrow pad">Ultimo valore per canale</h3>
+      @for (g of groups(); track g.name) {
+        <div class="group">
+          <div class="group__name">{{ g.name }}</div>
+          @for (r of g.rows; track r.ch.sensor_id) {
+            <button
+              type="button"
+              class="ch"
+              [class.on]="keyOf(r.ch) === chartKey()"
+              [class.missing]="!r.ch.presente"
+              (click)="selectChannel(keyOf(r.ch))"
+              [title]="r.ch.descrizione + ' · ' + r.ch.device_uid"
+            >
+              <span class="ch__label">{{ r.meta.label }}</span>
+              <svg
+                class="ch__spark"
+                viewBox="0 0 64 18"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path [attr.d]="r.spark" />
+              </svg>
+              <span class="ch__val">
+                @if (r.arrow !== null) {
+                  <svg
+                    class="arrow"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    [style.transform]="'rotate(' + r.arrow + 'deg)'"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M6 10.5V1.5M2.8 4.7L6 1.5l3.2 3.2"
+                      stroke="currentColor"
+                      stroke-width="1.4"
+                      fill="none"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                }
+                <b class="mono">{{ r.value }}</b>
+                <span class="u">{{ r.unit }}</span>
+              </span>
+              <span class="ch__extra">
+                @if (!r.ch.presente) {
+                  <span class="pill pill--warn">assente</span>
+                } @else if (r.ch.quality) {
+                  <span class="pill pill--warn">sospetto</span>
+                } @else if (r.extra) {
+                  <span class="mono muted">{{ r.extra }}</span>
+                }
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </section>
+
+    @if (chartChannel(); as c) {
+      <section class="sec">
+        <div class="chart-head">
+          <h3 class="eyebrow">
+            {{ range() === '24h' ? 'Ultime 24 h' : 'Ultimi 7 giorni · medie orarie' }}
+          </h3>
+          <div class="seg">
+            <button type="button" [class.on]="range() === '24h'" (click)="range.set('24h')">
+              24 h
+            </button>
+            <button type="button" [class.on]="range() === '7g'" (click)="range.set('7g')">
+              7 g
+            </button>
+          </div>
+        </div>
+        <div class="chart-title">
+          {{ c.meta.label }}
+          <span class="muted"
+            >·
+            {{
+              c.sensor.sensor_type === 'gps'
+                ? 'scostamento dalla posizione registrata, m'
+                : c.sensor.sensor_type === 'accelerometer'
+                  ? 'inclinazione, °'
+                  : c.meta.unit
+            }}</span
+          >
+        </div>
+        <ag-channel-chart
+          [stationId]="d.id"
+          [channel]="c.meta"
+          [sensorType]="c.sensor.sensor_type"
+          [depth]="c.sensor.profondita_cm"
+          [range]="range()"
+          [refresh]="chartRefresh()"
+          [simNow]="simNow()"
+          [origin]="{ lat: d.lat, lon: d.lon }"
+          [thresholds]="thresholds()"
+        />
+      </section>
+    }
+
+    <section class="sec">
+      <h3 class="eyebrow">Transizioni di stato</h3>
+      <ol class="log">
+        @for (t of log(); track t.avvenuto_il + t.a) {
+          <li>
+            <span class="mono muted">{{ dt(t.avvenuto_il) }}</span>
+            <span class="log__tr">
+              @if (t.da) {
+                <span class="diamond" [style.--c]="stateMeta(t.da).color"></span>
+                <ag-icon name="chevron" [size]="11" />
+              }
+              <span class="diamond" [style.--c]="stateMeta(t.a).color"></span>
+              <b>{{ stateMeta(t.a).label }}</b>
+            </span>
+            <span class="log__why">{{ t.motivo }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+
+    <section class="sec sec--sim">
+      <ag-station-faults [stationId]="d.id" [sensors]="d.sensors" [canEdit]="canEdit()" />
+    </section>
+
+    @if (canEdit()) {
+      <section class="sec danger">
+        <div>
+          <b>Elimina la stazione</b>
+          <p class="note">
+            Dismissione logica: credenziali MQTT revocate, allerte chiuse, terreno di nuovo su
+            SATELLITE. Lo storico resta.
+          </p>
+        </div>
+        <button class="btn btn--danger btn--sm" type="button" (click)="deleteRequest.emit(d)">
+          <ag-icon name="trash" [size]="14" /> Elimina
+        </button>
+      </section>
+    }
+  </div>
+} @else {
+  <div class="loading">
+    <span class="eyebrow">Caricamento del dettaglio…</span>
+  </div>
+}

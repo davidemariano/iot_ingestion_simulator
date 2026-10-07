@@ -1,0 +1,104 @@
+<div class="head">
+  <span class="sim-mark">Sim</span>
+  <h3>Guasti simulati</h3>
+  @if (active()) {
+    <span class="pill pill--warn">{{ active() }} attivi</span>
+    <button
+      class="btn btn--ghost btn--sm reset"
+      type="button"
+      (click)="reset()"
+      [disabled]="!canEdit()"
+    >
+      Ripristina
+    </button>
+  }
+</div>
+
+@if (f(); as f) {
+  <div class="toggles" [class.ro]="!canEdit()">
+    <label class="tg">
+      <input
+        type="checkbox"
+        [checked]="f.offline"
+        (change)="toggleOffline()"
+        [disabled]="!canEdit()"
+      />
+      <span class="sw"></span>
+      <span class="tg__txt"><b>Offline</b><small>nessun messaggio da nessun canale</small></span>
+    </label>
+    <label class="tg">
+      <input
+        type="checkbox"
+        [checked]="f.spostata_m > 0"
+        (change)="toggleMoved()"
+        [disabled]="!canEdit()"
+      />
+      <span class="sw"></span>
+      <span class="tg__txt"
+        ><b>Spostata di 150 m</b><small>GPS oltre la soglia di 50 m</small></span
+      >
+    </label>
+    <label class="tg">
+      <input
+        type="checkbox"
+        [checked]="f.inclinata_deg > 0"
+        (change)="toggleTilt()"
+        [disabled]="!canEdit()"
+      />
+      <span class="sw"></span>
+      <span class="tg__txt"
+        ><b>Inclinata di 30°</b><small>oltre 20° per più di 2 intervalli</small></span
+      >
+    </label>
+    <label class="tg">
+      <input
+        type="checkbox"
+        [checked]="f.picchi_pct > 0"
+        (change)="toggleSpikes()"
+        [disabled]="!canEdit()"
+      />
+      <span class="sw"></span>
+      <span class="tg__txt"
+        ><b>Picchi</b><small>{{ f.picchi_pct || 4 }}% dei valori, marcati sospetti</small></span
+      >
+    </label>
+  </div>
+
+  <div class="chips-head">
+    <span class="eyebrow">Canali</span>
+    <div class="seg">
+      <button type="button" [class.on]="mode() === 'silenzia'" (click)="mode.set('silenzia')">
+        Silenzia
+      </button>
+      <button type="button" [class.on]="mode() === 'blocca'" (click)="mode.set('blocca')">
+        Blocca valore
+      </button>
+    </div>
+  </div>
+  <div class="chips">
+    @for (c of chips(); track c.uid) {
+      <button
+        type="button"
+        class="chip mono"
+        [class.silenced]="c.silenced"
+        [class.stuck]="c.stuck"
+        [title]="c.label + (c.silenced ? ' · silenziato' : '') + (c.stuck ? ' · bloccato' : '')"
+        [disabled]="!canEdit() || (mode() === 'blocca' && !c.stuckable)"
+        (click)="toggleChip(c.uid)"
+      >
+        {{ c.short }}
+      </button>
+    }
+  </div>
+  <p class="note">
+    Un canale silenziato porta la stazione a <b>DEGRADATA</b> entro 2 intervalli e il terreno a
+    SATELLITE; un valore bloccato per oltre 6 h apre l’allerta <i>sensore sospetto</i>.
+  </p>
+
+  <button class="btn btn--sm" type="button" (click)="shock()" [disabled]="!canEdit()">
+    <ag-icon name="bolt" [size]="13" />
+    {{ shockSent() ? 'Urto inviato' : 'Simula un urto (> 2 g)' }}
+  </button>
+} @else {
+  <p class="muted">Caricamento…</p>
+}

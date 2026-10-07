@@ -1,0 +1,524 @@
+/*
+ * Design system della dashboard IoT.
+ * Palette IoT (Coolors): 59C3C3 · 52489C · EBEBEB · CAD2C5 · 84A98C.
+ * Semantica dei colori:
+ *   salvia  → operativo, sorgente IOT (ATTIVO_COMPLETO)
+ *   teal    → dati in arrivo, serie, stazione appena registrata (REGISTRATA)
+ *   indaco  → azioni, selezione, sistema; sorgente SATELLITE
+ *   grigio salvia → neutro, OFFLINE
+ * Ocra e mattone sono le uniche tinte fuori palette: servono a DEGRADATA/attenzione
+ * e a critica, e sono desaturate per stare accanto alla salvia.
+ */
+:root {
+  --p-teal: #59c3c3;
+  --p-indigo: #52489c;
+  --p-mist: #ebebeb;
+  --p-sage-gray: #cad2c5;
+  --p-sage: #84a98c;
+
+  --indigo-800: #2f2960;
+  --indigo-700: #3d3577;
+  --indigo-100: #dcd9ec;
+  --indigo-050: #edebf5;
+  --teal-700: #2c8282;
+  --teal-100: #d9f0f0;
+  --sage-700: #4c6f55;
+  --sage-100: #e2ebe4;
+  --sage-gray-700: #7d887f;
+
+  --ochre: #c08a2e;
+  --ochre-700: #86601a;
+  --ochre-100: #f4e8d0;
+  --brick: #b4513c;
+  --brick-700: #8c3a29;
+  --brick-100: #f3dcd6;
+
+  --ink: #1f1d2e;
+  --ink-2: #4b4f5d;
+  --ink-3: #6a6f7e;
+  --canvas: var(--p-mist);
+  --surface: #f6f6f4;
+  --surface-2: #ffffff;
+  --surface-sunk: #efefec;
+  --line: #dadfda;
+  --line-strong: var(--p-sage-gray);
+
+  --st-attivo: var(--p-sage);
+  --st-degradata: var(--ochre);
+  --st-offline: var(--p-sage-gray);
+  --st-registrata: var(--p-teal);
+
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --radius: 3px;
+  --hatch: repeating-linear-gradient(135deg, var(--indigo-100) 0 3px, transparent 3px 7px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font: 400 13px/1.45 var(--font-sans);
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--p-indigo);
+}
+
+:focus-visible {
+  outline: 2px solid var(--p-indigo);
+  outline-offset: 1px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+/* --- controlli ---------------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background-color 0.12s;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--ink-3);
+}
+
+.btn--primary {
+  background: var(--p-indigo);
+  border-color: var(--p-indigo);
+  color: #fff;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--indigo-700);
+  border-color: var(--indigo-700);
+}
+
+.btn--danger {
+  color: var(--brick-700);
+  border-color: #e0bdb4;
+}
+
+.btn--danger:hover:not(:disabled) {
+  border-color: var(--brick);
+  background: var(--brick-100);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-sunk);
+  border-color: transparent;
+}
+
+.btn--sm {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.btn--icon {
+  width: 30px;
+  padding: 0;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.field {
+  height: 30px;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.field:focus {
+  border-color: var(--p-indigo);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--indigo-100);
+}
+
+select.field {
+  padding-right: 4px;
+}
+
+input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--p-indigo);
+  cursor: pointer;
+}
+
+input[type='range'] {
+  accent-color: var(--p-indigo);
+}
+
+/* gruppo di pulsanti mutuamente esclusivi */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.seg > button {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.seg > button + button {
+  border-left: 1px solid var(--line);
+}
+
+.seg > button:hover:not(.on):not(:disabled) {
+  background: var(--surface-sunk);
+}
+
+.seg > button.on {
+  background: var(--p-indigo);
+  color: #fff;
+}
+
+.seg > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* --- stato della stazione ------------------------------------------------------------- */
+.diamond {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  transform: rotate(45deg);
+  background: var(--c, var(--st-offline));
+  box-shadow: inset 0 0 0 1px rgb(31 29 46 / 0.45);
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 2px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pill--iot {
+  background: var(--sage-100);
+  color: var(--sage-700);
+}
+
+.pill--sat {
+  background: transparent;
+  color: var(--p-indigo);
+  box-shadow: inset 0 0 0 1px var(--indigo-100);
+}
+
+.pill--warn {
+  background: var(--ochre-100);
+  color: var(--ochre-700);
+}
+
+.pill--crit {
+  background: var(--brick-100);
+  color: var(--brick-700);
+}
+
+.pill--ok {
+  background: var(--sage-100);
+  color: var(--sage-700);
+}
+
+.pill--data {
+  background: var(--teal-100);
+  color: var(--teal-700);
+}
+
+.pill--neutral {
+  background: var(--surface-sunk);
+  color: var(--ink-3);
+}
+
+/* controlli che esistono solo nel simulatore, non nel prodotto */
+.sim-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  background: var(--hatch);
+  box-shadow: inset 0 0 0 1px var(--indigo-100);
+  border-radius: 2px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--indigo-700);
+}
+
+/* --- scrollbar sottili -------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* --- Leaflet -------------------------------------------------------------------------------- */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: #e3e5e1;
+}
+
+.map--osm .leaflet-tile-pane {
+  filter: saturate(0.18) contrast(0.94) brightness(1.04);
+}
+
+.map--sat .leaflet-tile-pane {
+  filter: saturate(0.55) brightness(0.92);
+}
+
+.leaflet-bar {
+  border: 1px solid var(--line-strong) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: none !important;
+}
+
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 27px !important;
+  color: var(--ink) !important;
+  background: var(--surface) !important;
+  border-bottom-color: var(--line) !important;
+  font: 500 15px/27px var(--font-mono) !important;
+}
+
+.leaflet-control-attribution {
+  font-size: 10px;
+  color: var(--ink-3);
+  background: rgb(246 246 244 / 0.85) !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--ink-2);
+}
+
+.leaflet-tooltip.land-label {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-shadow:
+    0 0 2px #fff,
+    0 0 3px #fff,
+    0 0 4px #fff;
+  white-space: nowrap;
+}
+
+.map--sat .leaflet-tooltip.land-label {
+  color: #fff;
+  text-shadow:
+    0 0 2px #000,
+    0 0 3px #000;
+}
+
+.leaflet-tooltip.land-label::before {
+  display: none;
+}
+
+.leaflet-tooltip.st-tip {
+  padding: 4px 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: var(--surface);
+  box-shadow: none;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.leaflet-tooltip.st-tip::before {
+  display: none;
+}
+
+/* .leaflet-marker-icon è già position: absolute, e fa da contenitore per i figli */
+.st-marker > .d {
+  position: absolute;
+  inset: 4px;
+  transform: rotate(45deg);
+  background: var(--c);
+  box-shadow:
+    0 0 0 1.5px var(--ink),
+    0 0 0 3px rgb(255 255 255 / 0.85);
+  transition: transform 0.15s;
+}
+
+.st-marker.sel > .d {
+  transform: rotate(45deg) scale(1.25);
+  box-shadow:
+    0 0 0 1.5px var(--ink),
+    0 0 0 3px #fff,
+    0 0 0 5px var(--p-indigo);
+}
+
+.st-marker > .a {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ochre);
+  box-shadow: 0 0 0 1.5px #fff;
+}
+
+.st-marker > .a.crit {
+  background: var(--brick);
+}
+
+/* --- SweetAlert2 (conferme) ------------------------------------------------------------- */
+.swal2-container.ag-swal-wrap {
+  background: rgb(31 29 46 / 0.32) !important;
+}
+
+.swal2-popup.ag-swal {
+  width: 420px;
+  padding: 20px 22px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  font-family: var(--font-sans);
+  color: var(--ink);
+  text-align: left;
+}
+
+.ag-swal .swal2-title {
+  padding: 0;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--ink);
+}
+
+.ag-swal .swal2-html-container {
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  color: var(--ink-2);
+}
+
+.ag-swal .swal2-html-container ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.ag-swal .swal2-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  margin: 18px 0 0;
+}
+
+.ag-swal .swal2-actions .btn {
+  height: 30px;
+  margin: 0;
+  font-size: 13px;
+}

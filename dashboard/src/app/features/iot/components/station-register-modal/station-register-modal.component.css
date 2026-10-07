@@ -1,0 +1,146 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(31 29 46 / 0.32);
+}
+
+.dialog {
+  position: relative;
+  width: min(440px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-top: 3px solid var(--p-indigo);
+  border-radius: 4px;
+  animation: in 0.14s ease-out;
+}
+
+@keyframes in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+header {
+  position: relative;
+  padding: 16px 20px 12px;
+}
+
+h2 {
+  margin-top: 2px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+form {
+  padding: 0 20px 18px;
+}
+
+.lbl {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.req {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.field {
+  width: 100%;
+  height: 34px;
+  font-size: 14px;
+}
+
+.field[aria-invalid='true'] {
+  border-color: var(--brick);
+}
+
+.help {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.coords {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.coords > div:not(.coords__note) {
+  display: flex;
+  flex-direction: column;
+}
+
+.coords .mono {
+  font-size: 14px;
+}
+
+.coords__note {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.error {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--brick-100);
+  border-left: 3px solid var(--brick);
+  color: var(--brick-700);
+}
+
+.error ag-icon {
+  margin-top: 2px;
+}
+
+.error b {
+  font-weight: 600;
+}
+
+.error p {
+  color: var(--ink);
+}
+
+footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+footer .btn--primary {
+  min-width: 96px;
+}

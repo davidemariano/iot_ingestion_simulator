@@ -1,0 +1,150 @@
+<div class="head">
+  <div class="head__title">
+    <h2>Stazioni</h2>
+    <span class="mono muted">{{ stations().length }}</span>
+  </div>
+  <div class="bar" role="img" [attr.aria-label]="'Composizione per stato'">
+    @for (c of composition(); track c.key) {
+      @if (c.n) {
+        <span
+          [style.flex-grow]="c.n"
+          [style.background]="c.color"
+          [title]="c.label + ': ' + c.n"
+        ></span>
+      }
+    }
+  </div>
+  <div class="counts">
+    @for (c of composition(); track c.key) {
+      <span [class.zero]="!c.n"
+        ><span class="diamond" [style.--c]="c.color"></span><b class="mono">{{ c.n }}</b>
+        {{ c.label.toLowerCase() }}</span
+      >
+    }
+  </div>
+  <label class="search">
+    <ag-icon name="search" [size]="14" />
+    <input
+      class="field"
+      type="text"
+      placeholder="Cerca per nome, terreno, gateway"
+      [value]="query()"
+      (input)="query.set($any($event.target).value)"
+    />
+  </label>
+</div>
+
+@if (canEdit() && filtered().length) {
+  <label class="all">
+    <input type="checkbox" [checked]="allChecked()" (change)="toggleAll()" />
+    <span class="eyebrow">Seleziona tutte</span>
+  </label>
+}
+
+<ul class="list" role="listbox" aria-label="Stazioni registrate">
+  @for (s of filtered(); track s.id) {
+    <li
+      class="row"
+      role="option"
+      [class.sel]="s.id === selectedId()"
+      [attr.aria-selected]="s.id === selectedId()"
+      tabindex="0"
+      (click)="select.emit(s)"
+      (keydown.enter)="select.emit(s)"
+    >
+      @if (canEdit()) {
+        <input
+          type="checkbox"
+          [checked]="checked().has(s.id)"
+          (click)="toggle(s.id, $event)"
+          [attr.aria-label]="'Seleziona ' + s.nome"
+        />
+      }
+      <span class="diamond" [style.--c]="meta(s.stato).color"></span>
+      <div class="row__main">
+        <div class="row__name">{{ s.nome }}</div>
+        <div class="row__sub">{{ s.land_nome }}</div>
+      </div>
+      <div class="row__side">
+        <span
+          class="mono row__ago"
+          [title]="'Ultimo contatto: ' + (s.ultimo_contatto_il ?? 'mai')"
+          >{{ ago(s.ultimo_contatto_il, simNow()) }}</span
+        >
+        <span class="row__state">
+          @if (s.allerte_aperte) {
+            <span
+              class="alerts"
+              [class.crit]="s.allerta_max === 'critica'"
+              [title]="s.allerte_aperte + ' allerte aperte'"
+            >
+              <ag-icon name="alert" [size]="12" />{{ s.allerte_aperte }}
+            </span>
+          }
+          @if (s.stato !== 'ATTIVO_COMPLETO') {
+            <span [class]="'st st--' + s.stato">{{ meta(s.stato).label }}</span>
+          }
+        </span>
+      </div>
+    </li>
+  } @empty {
+    <li class="empty">
+      @if (loading()) {
+        Caricamento…
+      } @else if (query()) {
+        Nessuna stazione corrisponde a «{{ query() }}».
+      } @else {
+        <p>Nessuna stazione registrata.</p>
+        @if (canEdit()) {
+          <p class="muted">Fai clic su un terreno nella mappa per registrarne una.</p>
+        }
+      }
+    </li>
+  }
+</ul>
+
+@if (freeLands().real.length || freeLands().test) {
+  <section class="free">
+    <h3 class="eyebrow">
+      Terreni senza stazione
+      <span class="mono">{{ freeLands().real.length + freeLands().test }}</span>
+    </h3>
+    <ul>
+      @for (f of freeLands().real; track f.properties.id) {
+        <li>
+          <button
+            type="button"
+            (click)="landFocus.emit(f)"
+            [title]="'Centra ' + f.properties.nome + ' sulla mappa'"
+          >
+            <span class="sw"></span>
+            <span class="free__name">{{ f.properties.nome }}</span>
+            <span class="mono muted"
+              >{{ f.properties.area_ha.toFixed(1).replace('.', ',') }} ha</span
+            >
+          </button>
+        </li>
+      }
+    </ul>
+    @if (freeLands().test) {
+      <p class="muted free__more">+ {{ freeLands().test }} lotti di prova liberi</p>
+    }
+  </section>
+}
+
+@if (canEdit() && checkedStations().length) {
+  <div class="actions">
+    <div class="actions__top">
+      <span
+        ><b class="mono">{{ checkedStations().length }}</b>
+        {{ checkedStations().length === 1 ? 'selezionata' : 'selezionate' }}</span
+      >
+      <button class="btn btn--ghost btn--sm" type="button" (click)="clearChecked()">
+        Deseleziona
+      </button>
+    </div>
+    <button class="btn btn--danger" type="button" (click)="deleteMany.emit(checkedStations())">
+      <ag-icon name="trash" [size]="14" /> Elimina selezionate
+    </button>
+  </div>
+}

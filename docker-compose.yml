@@ -1,0 +1,29 @@
+# Avvio:   docker compose up --build            → http://localhost:8000
+# PoC:     docker compose --profile mqtt up     → anche Mosquitto + simulatore "traffico"
+services:
+  iot-simulator:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      IOTSIM_FATTORE: "20"
+      IOTSIM_SEME: "42"
+
+  # Broker reale per la modalità "traffico" (§13.3). Configurazione da sviluppo:
+  # in pre-produzione servono TLS su 8883 e il plugin dynamic security (§12).
+  iot-broker:
+    image: eclipse-mosquitto:2.0.20
+    profiles: ["mqtt"]
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  # Simulatore del PoC: rileva le stazioni via API e pubblica su Mosquitto
+  iot-traffico:
+    build: .
+    profiles: ["mqtt"]
+    depends_on:
+      - iot-simulator
+      - iot-broker
+    command: ["iotsim", "traffico", "--api", "http://iot-simulator:8000/api", "--mqtt-host", "iot-broker", "--fattore", "20"]

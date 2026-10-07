@@ -1,0 +1,435 @@
+<div class="page">
+  <header class="title">
+    <div>
+      <span class="sim-mark">Sim</span>
+      <h1>Console del simulatore</h1>
+      <p class="muted">
+        Banco di prova del layer di ingestion: tempo, meteo, carico e guasti iniettabili, con i KPI
+        del piano di test.
+      </p>
+    </div>
+    @if (flash(); as f) {
+      <div class="flash" role="status">{{ f }}</div>
+    }
+  </header>
+
+  <!-- controlli ------------------------------------------------------------------------- -->
+  <section class="controls" [class.ro]="!role.isAdmin()">
+    <div class="ctl">
+      <span class="eyebrow">Tempo</span>
+      <div class="ctl__row">
+        <button
+          class="btn btn--icon"
+          type="button"
+          (click)="togglePause()"
+          [disabled]="!role.isAdmin()"
+          [attr.aria-label]="stream.paused() ? 'Riprendi' : 'Pausa'"
+        >
+          <ag-icon [name]="stream.paused() ? 'play' : 'pause'" [size]="14" />
+        </button>
+        <div class="seg" role="group" aria-label="Compressione temporale">
+          @for (f of factors; track f) {
+            <button
+              type="button"
+              class="mono"
+              [class.on]="stream.factor() === f"
+              [disabled]="!role.isAdmin()"
+              (click)="setFactor(f)"
+            >
+              ×{{ f }}
+            </button>
+          }
+        </div>
+      </div>
+      <small class="muted">1 s reale = {{ num(stream.factor(), 0) }} s simulati</small>
+    </div>
+
+    <div class="ctl">
+      <span class="eyebrow">Meteo regionale</span>
+      <div class="seg" role="group" aria-label="Scenario meteo">
+        @for (sc of scenari; track sc[0]) {
+          <button
+            type="button"
+            [class.on]="s()?.scenario_meteo === sc[0]"
+            [disabled]="!role.isAdmin()"
+            (click)="setScenario(sc[0])"
+          >
+            {{ sc[1] }}
+          </button>
+        }
+      </div>
+      <small class="muted"
+        >La pioggia chiude lo stress idrico; siccità e caldo lo accelerano.</small
+      >
+    </div>
+
+    <div class="ctl">
+      <span class="eyebrow">Carico</span>
+      <div class="ctl__row">
+        <input
+          class="field mono n"
+          type="number"
+          min="1"
+          max="200"
+          [value]="bulkN()"
+          (input)="bulkN.set(+$any($event.target).value)"
+          aria-label="Numero di stazioni"
+          [disabled]="!role.isAdmin()"
+        />
+        <button
+          class="btn"
+          type="button"
+          (click)="createStations()"
+          [disabled]="!role.isAdmin() || busy() === 'bulk'"
+        >
+          <ag-icon name="plus" [size]="14" /> Registra stazioni di prova
+        </button>
+      </div>
+      <small class="muted"
+        >100 stazioni × 16 canali = scenario nominale S1 (≈ 8,9 msg/s a ×1)</small
+      >
+    </div>
+  </section>
+
+  <!-- KPI ------------------------------------------------------------------------------- -->
+  @if (s(); as st) {
+    <section class="kpis">
+      <div class="kpi">
+        <span class="eyebrow">Throughput</span>
+        <div class="kpi__v">
+          <b class="mono">{{ num(st.throughput.msg_s, 1) }}</b
+          ><span>msg/s</span>
+        </div>
+        <svg class="kpi__spark" viewBox="0 0 160 32" preserveAspectRatio="none" aria-hidden="true">
+          <path [attr.d]="spark()" />
+        </svg>
+        <small
+          >atteso {{ num(st.throughput.nominale_msg_s, 1) }} msg/s ·
+          {{ st.stazioni.canali }} canali</small
+        >
+      </div>
+      <div class="kpi">
+        <span class="eyebrow">Latenza invio → commit</span>
+        <div class="kpi__v">
+          <b class="mono">{{ st.latenza_s.p95 === null ? '—' : num(st.latenza_s.p95, 2) }}</b
+          ><span>s p95</span>
+        </div>
+        <div class="kpi__split mono">
+          <span>p50 {{ st.latenza_s.p50 === null ? '—' : num(st.latenza_s.p50, 2) }}</span>
+          <span>p99 {{ st.latenza_s.p99 === null ? '—' : num(st.latenza_s.p99, 2) }}</span>
+        </div>
+        <small>
+          @if (p95ok() === null) {
+            obiettivo p95 ≤ 5 s
+          } @else {
+            <span class="pill" [class.pill--ok]="p95ok()" [class.pill--crit]="!p95ok()"
+              >{{ p95ok() ? 'entro' : 'oltre' }} l’obiettivo di 5 s</span
+            >
+          }
+        </small>
+      </div>
+      <div class="kpi">
+        <span class="eyebrow">Salvati</span>
+        <div class="kpi__v">
+          <b class="mono">{{ count(saved()) }}</b>
+        </div>
+        <div class="kpi__split mono">
+          <span title="iot_measurements"
+            >misure {{ count(st.contatori.salvati['iot_measurements']) }}</span
+          >
+          <span title="iot_station_positions"
+            >gps {{ count(st.contatori.salvati['iot_station_positions']) }}</span
+          >
+          <span title="iot_station_motion"
+            >acc {{ count(st.contatori.salvati['iot_station_motion']) }}</span
+          >
+        </div>
+        <small
+          >{{ count(st.contatori.normalizzati) }} normalizzati ·
+          {{ count(st.contatori.sospetti) }} sospetti</small
+        >
+      </div>
+      <div class="kpi">
+        <span class="eyebrow">Scartati</span>
+        <div class="kpi__v" [class.warn]="discarded() > 0">
+          <b class="mono">{{ count(discarded()) }}</b>
+        </div>
+        <div class="kpi__split mono">
+          <span>dup {{ count(st.contatori.scartati['duplicato']) }}</span>
+          <span>range {{ count(st.contatori.scartati['fuori_intervallo']) }}</span>
+        </div>
+        <small>{{ count(rejected()) }} rifiutati dal broker</small>
+      </div>
+      <div class="kpi">
+        <span class="eyebrow">Perdite (seq)</span>
+        <div class="kpi__v" [class.crit]="st.contatori.perdite > 0">
+          <b class="mono">{{ count(st.contatori.perdite) }}</b>
+        </div>
+        <div class="kpi__split mono">
+          <span>riconsegnati {{ count(st.contatori.riconsegnati) }}</span>
+        </div>
+        <small>
+          <span
+            class="pill"
+            [class.pill--ok]="st.contatori.perdite === 0"
+            [class.pill--crit]="st.contatori.perdite > 0"
+            >QoS 1 · ack dopo il commit</span
+          >
+        </small>
+      </div>
+      <div class="kpi">
+        <span class="eyebrow">Broker</span>
+        <div class="kpi__v">
+          <b class="mono">{{ count(st.broker.in_coda) }}</b
+          ><span>in coda</span>
+        </div>
+        <div class="kpi__split mono">
+          <span>in volo {{ count(st.broker.in_volo) }}</span>
+          <span>ritardati {{ count(st.broker.ritardati) }}</span>
+        </div>
+        <small>
+          batch {{ count(st.contatori.batch) }} · ultimo {{ st.contatori.ultimo_batch }} msg
+          @if (st.contatori.errori_db) {
+            · <span class="crit-txt">{{ st.contatori.errori_db }} commit falliti</span>
+          }
+        </small>
+      </div>
+    </section>
+  }
+
+  <div class="cols">
+    <!-- flusso MQTT ----------------------------------------------------------------------- -->
+    <section class="panel tail">
+      <header class="panel__head">
+        <h2>Flusso MQTT</h2>
+        <span class="muted mono topic"
+          >agrivalor/{{ '{' }}gateway{{ '}' }}/{{ '{' }}device{{ '}' }}/telemetry · QoS 1</span
+        >
+        <div class="seg">
+          <button type="button" [class.on]="filter() === 'tutti'" (click)="filter.set('tutti')">
+            Tutti
+          </button>
+          <button type="button" [class.on]="filter() === 'scarti'" (click)="filter.set('scarti')">
+            Scarti e sospetti
+          </button>
+          <button type="button" [class.on]="filter() === 'rifiuti'" (click)="filter.set('rifiuti')">
+            Rifiuti broker
+          </button>
+        </div>
+      </header>
+      <div class="table-wrap">
+        <table class="msgs">
+          <thead>
+            <tr>
+              <th>Misura</th>
+              <th>Device</th>
+              <th>Stazione</th>
+              <th>Valore / dettaglio</th>
+              <th>Esito</th>
+              <th class="r">Latenza</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (m of messages(); track $index) {
+              <tr [class]="'e-' + m.esito">
+                <td class="mono muted">{{ m.ts ? time(m.ts) : '—' }}</td>
+                <td class="mono dev">
+                  {{ shortTopic(m) }}
+                  @if (m.dup) {
+                    <span class="dup">DUP</span>
+                  }
+                </td>
+                <td class="st">{{ m.stazione ?? '—' }}</td>
+                <td class="mono val">{{ m.valore }}</td>
+                <td>
+                  <span
+                    class="pill"
+                    [class.pill--ok]="m.esito === 'salvato'"
+                    [class.pill--warn]="m.esito === 'sospetto'"
+                    [class.pill--crit]="m.esito === 'scartato'"
+                    [class.pill--sat]="m.esito === 'rifiutato'"
+                    [title]="causeLabel(m.causa)"
+                    >{{ m.esito === 'salvato' ? 'salvato' : causeLabel(m.causa) || m.esito }}</span
+                  >
+                </td>
+                <td class="mono r">
+                  {{ m.latenza_ms === null ? '' : count(m.latenza_ms) + ' ms' }}
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="empty">
+                  Nessun messaggio{{ filter() !== 'tutti' ? ' per questo filtro' : '' }}.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="side">
+      <section class="panel">
+        <header class="panel__head"><h2>Scarti per causa</h2></header>
+        <div class="bars">
+          @for (c of causes(); track c.k) {
+            <div class="bar">
+              <span class="bar__label"
+                >{{ c.label }}<small>{{ c.where }}</small></span
+              >
+              <span class="bar__track"
+                ><span [style.width.%]="c.w" [class.broker]="c.where === 'broker'"></span
+              ></span>
+              <b class="mono">{{ count(c.n) }}</b>
+            </div>
+          } @empty {
+            <p class="muted pad">
+              Nessuno scarto: attiva un guasto sul traffico per vedere la validazione al lavoro.
+            </p>
+          }
+        </div>
+      </section>
+
+      <section class="panel">
+        <header class="panel__head"><h2>Distribuzione della latenza</h2></header>
+        <div class="hist">
+          @for (b of histogram(); track b.fascia) {
+            <div class="hist__col" [title]="b.fascia + ': ' + b.n">
+              <span class="hist__bar" [style.height.%]="b.h"></span>
+              <span class="mono hist__n">{{ b.n }}</span>
+              <span class="mono hist__x">{{ b.fascia }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="cols">
+    <section class="panel">
+      <header class="panel__head">
+        <h2>Guasti sul traffico</h2>
+        @if (activeFaults()) {
+          <span class="pill pill--warn">{{ activeFaults() }} attivi</span>
+          <button
+            class="btn btn--ghost btn--sm"
+            type="button"
+            (click)="resetFaults()"
+            [disabled]="!role.isAdmin()"
+          >
+            Azzera
+          </button>
+        }
+      </header>
+      <div class="faults">
+        @for (f of faults; track f.key) {
+          <label class="fault">
+            <span class="fault__label"
+              >{{ f.label }}<small>{{ f.hint }}</small></span
+            >
+            <input
+              type="range"
+              min="0"
+              max="20"
+              step="0.5"
+              [value]="faultValue(f.key)"
+              [disabled]="!role.isAdmin()"
+              (change)="setFault(f.key, +$any($event.target).value)"
+              [attr.aria-label]="f.label"
+            />
+            <b class="mono">{{ num(faultValue(f.key), 1) }}%</b>
+          </label>
+        }
+        <label class="fault">
+          <span class="fault__label">Entità del ritardo<small>tempo simulato</small></span>
+          <select
+            class="field mono"
+            [value]="faultValue('ritardo_s')"
+            (change)="setFault('ritardo_s', +$any($event.target).value)"
+            [disabled]="!role.isAdmin()"
+          >
+            @for (d of delays; track d) {
+              <option [value]="d" [selected]="faultValue('ritardo_s') === d">
+                {{ d < 3600 ? d / 60 + ' min' : d / 3600 + ' h' }}
+              </option>
+            }
+          </select>
+          <span></span>
+        </label>
+      </div>
+
+      <div class="resil">
+        <h3 class="eyebrow">Resilienza (scenario S3)</h3>
+        <div class="resil__row">
+          <button
+            class="btn"
+            type="button"
+            (click)="restart()"
+            [disabled]="!role.isAdmin() || busy() === 'restart'"
+          >
+            <ag-icon name="restart" [size]="14" /> Riavvia l’ingestion
+          </button>
+          <span class="muted"
+            >Il batch in corso è già salvato ma senza PUBACK: il broker lo riconsegna, la chiave
+            primaria lo deduplica.</span
+          >
+        </div>
+        <div class="resil__row">
+          <button
+            class="btn"
+            type="button"
+            (click)="dbDown()"
+            [disabled]="!role.isAdmin() || s()?.servizi?.database === false"
+          >
+            <ag-icon name="db" [size]="14" /> Database giù per 60 s
+          </button>
+          <span class="muted">
+            @if (s()?.servizi?.database === false) {
+              <span class="pill pill--crit">non disponibile</span> i messaggi restano nella sessione
+              persistente del broker.
+            } @else {
+              Nessun PUBACK finché il commit non riesce: nessuna perdita alla ripresa.
+            }
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <div class="side">
+      <section class="panel">
+        <header class="panel__head"><h2>Partizioni mensili</h2></header>
+        <table class="parts">
+          @for (p of partitions(); track p.name) {
+            <tr [class.def]="p.isDefault">
+              <td class="mono">{{ p.name }}</td>
+              <td class="mono r">{{ count(p.n) }}</td>
+            </tr>
+          }
+        </table>
+        <p class="muted pad small">
+          Create in anticipo per i 2 mesi successivi; la partizione
+          <span class="mono">default</span> deve restare vuota.
+        </p>
+      </section>
+
+      <section class="panel">
+        <header class="panel__head"><h2>Eventi</h2></header>
+        <ol class="events">
+          @for (e of events(); track $index) {
+            <li [class]="'ev-' + e.tipo + (e.severita ? ' sev-' + e.severita : '')">
+              <span class="mono muted">{{ time(e.sim_ts) }}</span>
+              <span class="ev__body">
+                @if (e.stazione) {
+                  <b>{{ e.stazione }}</b>
+                }
+                {{ eventText(e) }}
+              </span>
+            </li>
+          } @empty {
+            <li class="muted empty-ev">In attesa di eventi…</li>
+          }
+        </ol>
+      </section>
+    </div>
+  </div>
+</div>
