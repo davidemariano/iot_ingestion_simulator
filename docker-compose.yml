@@ -1,10 +1,13 @@
-# Avvio:  docker compose up --build        (oppure docker-compose up --build)
-#         → dashboard e API su http://localhost:8080  (Swagger: /api/docs)
+# Richiede Docker Compose v2: Docker Desktop (macOS, Windows) oppure, su Linux, Docker Engine
+# con il pacchetto docker-compose-plugin. Il vecchio docker-compose 1.x di apt non è supportato.
 #
-# Broker reale e simulatore "traffico" (§13.3), facoltativi:
-#         docker compose --profile mqtt up --build
+#   docker compose up --build     (o docker-compose up --build con Compose v2)
+#   → dashboard e API su http://localhost:8080 · Swagger su http://localhost:8080/api/docs
 #
-# Le variabili si possono cambiare in un file .env accanto a questo (vedi .env.example).
+# Mosquitto e il simulatore "traffico" (§13.3) sono nel profilo mqtt:
+#   docker compose --profile mqtt up --build
+# oppure COMPOSE_PROFILES=mqtt nel file .env, per avviarli con il solo up --build.
+# Le variabili si cambiano in un file .env accanto a questo (vedi .env.example).
 
 services:
   # Simulatore integrato: broker emulato, ingestion, registro, modelli NRT, API /iot
@@ -16,6 +19,7 @@ services:
       IOTSIM_SEME: ${IOTSIM_SEME:-42}
       IOTSIM_STORICO_H: ${IOTSIM_STORICO_H:-24}
       IOTSIM_CREA_STAZIONI: ${IOTSIM_CREA_STAZIONI:-0}
+      IOTSIM_VUOTO: ${IOTSIM_VUOTO:-0}
     restart: unless-stopped
 
   # Dashboard Angular servita da nginx, che inoltra /api al simulatore
@@ -23,22 +27,26 @@ services:
     build: ./dashboard
     image: agrivalor-iot/dashboard:local
     ports:
-      - "${DASHBOARD_PORT:-8080}:8080"
+      - "${BIND_ADDR:-127.0.0.1}:${DASHBOARD_PORT:-8080}:8080"
     depends_on:
       simulator:
         condition: service_healthy
+        restart: true
+    # arresto immediato: con SIGQUIT nginx aspetterebbe la chiusura dello stream SSE
+    stop_signal: SIGTERM
     restart: unless-stopped
 
   # --- profilo "mqtt" ---------------------------------------------------------------
   # Mosquitto da sviluppo (anonimo, 1883). In pre-produzione: TLS su 8883 e plugin
   # dynamic security con credenziali per stazione (§12).
   mosquitto:
-    image: eclipse-mosquitto:2.0.20
+    image: eclipse-mosquitto:2.0.22
     profiles: ["mqtt"]
     ports:
-      - "${MQTT_PORT:-1883}:1883"
+      - "${BIND_ADDR:-127.0.0.1}:${MQTT_PORT:-1883}:1883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
     healthcheck:
       test: ["CMD", "mosquitto_sub", "-h", "127.0.0.1", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
       interval: 10s
@@ -67,3 +75,6 @@ services:
     healthcheck:
       disable: true
     restart: unless-stopped
+
+volumes:
+  mosquitto-data:

@@ -4,37 +4,77 @@ Simulatore del Proof of Concept descritto in `SPECIFICHE_IOT_INGESTION.md` v0.2:
 traffico MQTT con guasti iniettabili, ingestion con validazione e deduplicazione, verifica di completezza,
 selezione della sorgente `IOT`/`SATELLITE`, modelli near-real-time e dashboard Angular + Leaflet.
 
-Due modi d'uso:
+## Avvio
 
-| Modalità | Comando | A cosa serve |
+Serve solo Docker con **Compose v2**: Docker Desktop su macOS e Windows, oppure, su Linux, Docker Engine
+con il pacchetto `docker-compose-plugin`. Il vecchio `docker-compose` 1.x installato da apt non è supportato.
+
+```bash
+docker compose up --build        # oppure docker-compose up --build, se è la v2
+```
+
+Poi apri **http://localhost:8080**:
+
+| Indirizzo | Cosa trovi |
+| --- | --- |
+| http://localhost:8080/stazioni | mappa, registrazione, menu laterale, dettaglio delle stazioni |
+| http://localhost:8080/simulatore | console: tempo, meteo, carico, guasti, KPI |
+| http://localhost:8080/api/docs | Swagger delle API `/iot` e `/sim` |
+
+La prima build richiede qualche minuto (dipendenze npm e pip, build di Angular); le successive usano la cache.
+All'avvio il simulatore genera 24 ore di storico per 3 stazioni demo (una con stress idrico già aperto);
+3 terreni restano liberi per registrarne di nuove con un clic sulla mappa. Nei log compare la porta 8000:
+è interna, si passa sempre da 8080.
+
+| Servizio | Immagine | Ruolo |
 | --- | --- | --- |
-| **Integrata** | `iotsim serve` | Tutto in un processo: broker MQTT emulato, ingestion, registro, task periodici, API `/iot` e dashboard. Per sviluppare la UI, provare i criteri di accettazione e fare demo senza lo stack di Agrivalor. |
-| **Traffico** | `iotsim traffico` | Il simulatore del §13.3: rileva le stazioni via `GET /iot/stations` e pubblica su un **Mosquitto reale**. È il componente `iot-simulator` da usare contro lo stack vero. |
+| `simulator` | `simulator/Dockerfile` (Python 3.13) | broker emulato, ingestion, registro, modelli NRT, API `/iot` |
+| `dashboard` | `dashboard/Dockerfile` (build Angular → nginx) | serve la SPA e inoltra `/api` al simulatore, SSE compreso |
+| `mosquitto` | `eclipse-mosquitto:2.0.22` | broker reale, solo profilo `mqtt` |
+| `traffico` | come `simulator`, comando `iotsim traffico` | simulatore del §13.3 verso Mosquitto, solo profilo `mqtt` |
 
-## Avvio rapido
-
-```bash
-# 1. backend (Python ≥ 3.11)
-cd simulator
-python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
-iotsim serve --fattore 20          # http://127.0.0.1:8000/api/docs
-
-# 2. dashboard (Node 22) — in un secondo terminale
-cd dashboard
-npm install
-npm start                          # http://localhost:4200
-```
-
-Oppure un'unica immagine con la dashboard già compilata:
+### Fermare e ripartire
 
 ```bash
-docker compose up --build          # http://localhost:8000
-docker compose --profile mqtt up   # + Mosquitto e simulatore "traffico"
+docker compose up --build -d     # in background
+docker compose logs -f simulator # log del simulatore
+docker compose restart simulator # nuova simulazione da zero (lo stato è in memoria)
+docker compose down              # ferma tutto (aggiungi --profile mqtt se lo hai usato, -v per i volumi)
 ```
 
-All'avvio vengono registrate 3 stazioni demo con 24 ore di storico (una con stress idrico già aperto);
-3 terreni restano liberi per registrarne di nuove con un clic sulla mappa.
+### Configurazione
+
+Copia `.env.example` in `.env` (su Windows `Copy-Item .env.example .env`), cambia i valori e rilancia
+`docker compose up -d`.
+
+| Variabile | Default | Effetto |
+| --- | --- | --- |
+| `DASHBOARD_PORT` | `8080` | porta della dashboard sull'host |
+| `BIND_ADDR` | `127.0.0.1` | interfaccia delle porte pubblicate; `0.0.0.0` per mostrarla in rete (non c'è autenticazione) |
+| `IOTSIM_FATTORE` | `20` | compressione temporale: 1 s reale = N s simulati |
+| `IOTSIM_SEME` | `42` | seme dei generatori: stesso seme, stessa simulazione |
+| `IOTSIM_STORICO_H` | `24` | ore di storico generate all'avvio |
+| `IOTSIM_VUOTO` | `0` | `1` = nessuna stazione demo |
+| `IOTSIM_CREA_STAZIONI` | `0` | stazioni di prova da registrare all'avvio (100 = scenario S1) |
+| `COMPOSE_PROFILES` | — | `mqtt` per avviare anche Mosquitto e `traffico` con il solo `up --build` |
+| `MQTT_PORT` | `1883` | porta di Mosquitto sull'host |
+
+### Mosquitto e simulatore "traffico" (profilo `mqtt`)
+
+```bash
+docker compose --profile mqtt up --build
+docker compose exec mosquitto mosquitto_sub -t 'agrivalor/#' -v -C 5    # guarda il traffico
+```
+
+`traffico` è il simulatore del PoC (§13.3): rileva le stazioni da `GET /iot/stations` del servizio `simulator` e
+pubblica su Mosquitto un messaggio per canale, QoS 1, con i payload del §8.5. Nel PoC reale a valle c'è
+`iot-ingestion`; qui nessuno legge da Mosquitto, quindi questo traffico **non alimenta la dashboard**, che usa il
+broker emulato interno. Per lo scenario S4 con guasti sul traffico:
+
+```bash
+docker compose --profile mqtt stop traffico
+docker compose --profile mqtt run --rm traffico iotsim traffico --duplicati 2 --fuori-intervallo 5 --fuori-ordine 1
+```
 
 ## Cosa c'è
 
@@ -59,7 +99,11 @@ simulator/                 Python 3.11+, FastAPI, Pydantic v2
 dashboard/                 Angular 21, Leaflet 1.9, Chart.js 4, SweetAlert2
   src/app/features/iot/    struttura del §10.1: pagina, modale, menu laterale, dettaglio, servizio API
   src/app/features/simulator/   console del simulatore (tempo, meteo, carico, guasti, KPI)
+mosquitto/mosquitto.conf   configurazione da sviluppo del broker reale
 docs/ANALISI_SPECIFICHE.md copertura dei requisiti, misure, scostamenti da riportare nel §15
+docker-compose.yml         simulator + dashboard; mosquitto + traffico nel profilo mqtt
+simulator/Dockerfile       immagine Python non-root, dipendenze vincolate da constraints.txt
+dashboard/Dockerfile       build Angular + nginx-unprivileged (dashboard/nginx.conf)
 ```
 
 ## Dashboard
@@ -91,12 +135,12 @@ La palette non ha toni caldi: `DEGRADATA`/attenzione e critica usano un ocra (`#
 filetti da 1 px invece di ombre, raggi di 3 px. I controlli che esistono solo nel simulatore sono marcati
 da un'etichetta tratteggiata **SIM**, per non confonderli con il prodotto.
 
-## Modalità traffico (simulatore del PoC)
+## Simulatore "traffico" verso lo stack reale
 
 ```bash
-iotsim traffico \
+docker compose run --rm --no-deps -v "$PWD/ca.crt:/certs/ca.crt:ro" traffico iotsim traffico \
   --api https://agrivalor.example/api --utente simulatore --password '…' \
-  --mqtt-host broker.example --mqtt-port 8883 --tls --ca ca.crt \
+  --mqtt-host broker.example --mqtt-port 8883 --tls --ca /certs/ca.crt \
   --mqtt-utente iot-simulator --mqtt-password '…' \
   --fattore 20 --durata 24h --seme 42 \
   --duplicati 2 --fuori-intervallo 5 --fuori-ordine 1      # scenario S4
@@ -105,6 +149,16 @@ iotsim traffico \
 - Token dal login proxy `POST {api}/keycloak/login` (`{username, password}` → `access_token`), oppure `--token`.
 - `--crea-stazioni N` registra N stazioni via API in punti casuali dei terreni liberi dell'utente.
 - Un messaggio per canale, topic `agrivalor/{gateway_id}/{device_uid}/telemetry`, QoS 1, payload del §8.5.
+
+## Sviluppo senza Docker
+
+Serve solo per lavorare sul codice con ricaricamento automatico.
+
+```bash
+cd simulator && python -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
+iotsim serve                       # API su http://127.0.0.1:8000
+cd dashboard && npm install && npm start   # http://localhost:4200, proxy /api → 127.0.0.1:8000
+```
 
 ## Test
 

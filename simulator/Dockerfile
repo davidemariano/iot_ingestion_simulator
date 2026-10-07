@@ -5,14 +5,15 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PIP_ROOT_USER_ACTION=ignore
 
 WORKDIR /app
 
-# 1) solo le dipendenze, così cambiare il codice non le reinstalla
-COPY pyproject.toml ./
+# 1) solo le dipendenze, alle versioni verificate: cambiare il codice non le reinstalla
+COPY pyproject.toml constraints.txt ./
 RUN mkdir -p src/iotsim && touch src/iotsim/__init__.py \
-    && pip install ".[mqtt]" \
+    && pip install -c constraints.txt ".[mqtt]" \
     && pip uninstall -y iotsim
 
 # 2) il pacchetto

@@ -60,7 +60,7 @@ Il repository copre questo componente in due modi:
 | AC3 duplicati e fuori intervallo contati | ✓ | `test_validation_causes_and_dedup`, `test_fault_injection_counts` |
 | AC4 stress idrico aperto in siccità, chiuso dopo la pioggia | ✓ | `test_ac4_…` (terreno sabbioso, scenario Pioggia) |
 | AC5 nessuna regressione | n/a | il simulatore non tocca lo stack esistente |
-| AC6 avvio documentato | ✓ | README, `docker compose up` (Compose non verificato in questo ambiente: niente daemon Docker) |
+| AC6 avvio documentato | ✓ | `docker compose up --build` → http://localhost:8080 (Swagger `/api/docs`); profilo `mqtt` con Mosquitto e traffico. Verificati build da cache vuota, healthcheck, proxy `/api` e SSE via nginx, flusso e2e nel browser |
 | AC7 dati entro 60 s, completa entro 2 intervalli | ✓ | `test_ac7_…`: prima misura al rilevamento, completa al primo controllo |
 | AC8 clic fuori dai terreni → errore nella modale | ✓ | test API + e2e in browser |
 | AC9 eliminazione: credenziali revocate, sorgente `SATELLITE` | ✓ | `test_ac9_…`: 16 PUBLISH rifiutate dal broker prima del rilevamento successivo |

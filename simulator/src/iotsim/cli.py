@@ -32,7 +32,16 @@ def cmd_serve(a: argparse.Namespace) -> None:
     if a.crea_stazioni:
         engine.create_test_stations(a.crea_stazioni)
     app = create_app(engine, static_dir=a.static)
-    uvicorn.run(app, host=a.host, port=a.port, log_level="info")
+    # timeout breve: lo stream SSE della console resta aperto e altrimenti bloccherebbe l'arresto
+    config = uvicorn.Config(app, host=a.host, port=a.port, log_level="info", timeout_graceful_shutdown=2)
+    # dopo Config, che configura i logger: le sonde dell'healthcheck non riempiono il log
+    logging.getLogger("uvicorn.access").addFilter(_DropHealthcheck())
+    uvicorn.Server(config).run()
+
+
+class _DropHealthcheck(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "/api/health" not in record.getMessage()
 
 
 def cmd_traffico(a: argparse.Namespace) -> int:

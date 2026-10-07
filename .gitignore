@@ -12,6 +12,9 @@ node_modules/
 dashboard/dist/
 dashboard/.angular/
 
+# configurazione locale di docker compose
+.env
+
 # IDE / OS
 .idea/
 .vscode/
