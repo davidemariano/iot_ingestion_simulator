@@ -61,9 +61,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--fattore", type=float, default=float(os.getenv("IOTSIM_FATTORE", "20")),
                    help="compressione temporale (default ×20)")
     s.add_argument("--seme", type=int, default=int(os.getenv("IOTSIM_SEME", "42")))
-    s.add_argument("--storico-h", type=int, default=24, help="ore di storico generate all'avvio")
-    s.add_argument("--vuoto", action="store_true", help="nessuna stazione demo")
-    s.add_argument("--crea-stazioni", type=int, default=0, metavar="N", help="registra N stazioni di prova")
+    s.add_argument("--storico-h", type=int, default=int(os.getenv("IOTSIM_STORICO_H", "24")),
+                   help="ore di storico generate all'avvio")
+    s.add_argument("--vuoto", action="store_true", default=os.getenv("IOTSIM_VUOTO", "") in ("1", "true"),
+                   help="nessuna stazione demo")
+    s.add_argument("--crea-stazioni", type=int, default=int(os.getenv("IOTSIM_CREA_STAZIONI", "0")), metavar="N",
+                   help="registra N stazioni di prova")
     s.add_argument("--static", default=os.getenv("IOTSIM_STATIC_DIR"), help="cartella della dashboard compilata")
     s.set_defaults(func=cmd_serve)
 
@@ -81,9 +84,9 @@ def main(argv: list[str] | None = None) -> int:
     t.add_argument("--mqtt-password", default=os.getenv("IOTSIM_MQTT_PASSWORD"))
     t.add_argument("--tls", action="store_true", help="MQTT su TLS (porta 8883)")
     t.add_argument("--ca", default=os.getenv("IOTSIM_MQTT_CA"), help="certificato CA del broker")
-    t.add_argument("--fattore", type=float, default=20)
+    t.add_argument("--fattore", type=float, default=float(os.getenv("IOTSIM_FATTORE", "20")))
     t.add_argument("--durata", type=_duration, default=None, help="durata simulata, es. 24h (default: infinita)")
-    t.add_argument("--seme", type=int, default=42)
+    t.add_argument("--seme", type=int, default=int(os.getenv("IOTSIM_SEME", "42")))
     t.add_argument("--crea-stazioni", type=int, default=0, metavar="N",
                    help="registra N stazioni via API in punti casuali dei terreni liberi")
     t.add_argument("--scoperta-s", type=float, default=60, help="periodo di rilevamento, secondi simulati")

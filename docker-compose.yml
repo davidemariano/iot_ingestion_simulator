@@ -1,29 +1,69 @@
-# Avvio:   docker compose up --build            → http://localhost:8000
-# PoC:     docker compose --profile mqtt up     → anche Mosquitto + simulatore "traffico"
-services:
-  iot-simulator:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      IOTSIM_FATTORE: "20"
-      IOTSIM_SEME: "42"
+# Avvio:  docker compose up --build        (oppure docker-compose up --build)
+#         → dashboard e API su http://localhost:8080  (Swagger: /api/docs)
+#
+# Broker reale e simulatore "traffico" (§13.3), facoltativi:
+#         docker compose --profile mqtt up --build
+#
+# Le variabili si possono cambiare in un file .env accanto a questo (vedi .env.example).
 
-  # Broker reale per la modalità "traffico" (§13.3). Configurazione da sviluppo:
-  # in pre-produzione servono TLS su 8883 e il plugin dynamic security (§12).
-  iot-broker:
+services:
+  # Simulatore integrato: broker emulato, ingestion, registro, modelli NRT, API /iot
+  simulator:
+    build: ./simulator
+    image: agrivalor-iot/simulator:local
+    environment:
+      IOTSIM_FATTORE: ${IOTSIM_FATTORE:-20}
+      IOTSIM_SEME: ${IOTSIM_SEME:-42}
+      IOTSIM_STORICO_H: ${IOTSIM_STORICO_H:-24}
+      IOTSIM_CREA_STAZIONI: ${IOTSIM_CREA_STAZIONI:-0}
+    restart: unless-stopped
+
+  # Dashboard Angular servita da nginx, che inoltra /api al simulatore
+  dashboard:
+    build: ./dashboard
+    image: agrivalor-iot/dashboard:local
+    ports:
+      - "${DASHBOARD_PORT:-8080}:8080"
+    depends_on:
+      simulator:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --- profilo "mqtt" ---------------------------------------------------------------
+  # Mosquitto da sviluppo (anonimo, 1883). In pre-produzione: TLS su 8883 e plugin
+  # dynamic security con credenziali per stazione (§12).
+  mosquitto:
     image: eclipse-mosquitto:2.0.20
     profiles: ["mqtt"]
     ports:
-      - "1883:1883"
+      - "${MQTT_PORT:-1883}:1883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "127.0.0.1", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
-  # Simulatore del PoC: rileva le stazioni via API e pubblica su Mosquitto
-  iot-traffico:
-    build: .
+  # Simulatore del PoC: rileva le stazioni via API e pubblica i 16 canali su Mosquitto
+  traffico:
+    build: ./simulator
+    image: agrivalor-iot/traffico:local  # stessi layer del simulatore, tag distinto: un tag
+                                         # condiviso fra due build ricreerebbe il simulatore
     profiles: ["mqtt"]
+    command: ["iotsim", "traffico"]
+    environment:
+      IOTSIM_API: http://simulator:8000/api
+      IOTSIM_MQTT_HOST: mosquitto
+      IOTSIM_MQTT_PORT: "1883"
+      IOTSIM_FATTORE: ${IOTSIM_FATTORE:-20}
+      IOTSIM_SEME: ${IOTSIM_SEME:-42}
     depends_on:
-      - iot-simulator
-      - iot-broker
-    command: ["iotsim", "traffico", "--api", "http://iot-simulator:8000/api", "--mqtt-host", "iot-broker", "--fattore", "20"]
+      simulator:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    restart: unless-stopped

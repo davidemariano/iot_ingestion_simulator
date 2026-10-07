@@ -530,6 +530,11 @@ def create_app(engine: Engine | None = None, run_loops: bool = True, static_dir:
         return StreamingResponse(gen(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+    @app.get("/api/health", tags=["servizio"])
+    def health():
+        """Sonda per l'healthcheck dei container: risponde appena il motore è inizializzato."""
+        return {"ok": True, "sim_now": eng.clock.now().isoformat()}
+
     app.include_router(lands)
     app.include_router(iot)
     app.include_router(sim)
